@@ -1,0 +1,105 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2f3a;
+  --text: #e8ecf4;
+  --muted: #9aa3b2;
+  --accent: #3d8bfd;
+  --danger: #e35d6a;
+  --label: #1d2230;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+}
+
+.cell-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+button:hover { border-color: #3a4254; background: #1d2330; }
+button.danger {
+  color: #ffd0d5;
+  border-color: #5a2a32;
+  background: #2a1519;
+}
+button.danger:hover { background: #3a1b21; }
+
+.grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  background: #000;
+  pointer-events: none;
+}
+
+.cell {
+  position: relative;
+  background: transparent;
+  pointer-events: none;
+}
+
+.label {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  background: var(--label);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  pointer-events: auto;
+}
+
+.label span::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.cell[data-account="1"] .label span::before { background: #60a5fa; }
+.cell[data-account="2"] .label span::before { background: #fbbf24; }
+.cell[data-account="3"] .label span::before { background: #f472b6; }
+
+.cell-actions button {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  min-width: 28px;
+}
+
+.zoom-label {
+  min-width: 40px;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

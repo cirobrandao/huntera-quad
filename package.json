@@ -1,0 +1,44 @@
+{
+  "name": "huntera-quad",
+  "version": "1.1.0",
+  "description": "Navegador 2x2 com sessões isoladas para huntera.com.br",
+  "main": "main.js",
+  "author": "Ciro Brandão",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable --x64",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "br.com.huntera.quad",
+    "productName": "Huntera Quad",
+    "copyright": "Copyright © Ciro Brandão",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "Huntera-Quad-Portable.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  }
+}
