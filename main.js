@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, Menu, shell, session, nativeImage } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, Menu, shell, session, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const tls = require('tls');
@@ -18,7 +18,7 @@ const NAME_MAX_LEN = 32;
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
-/** @type {BrowserView[]} */
+/** @type {WebContentsView[]} */
 const views = [];
 /** @type {number[]} */
 const zoomFactors = [1, 1, 1, 1];
@@ -152,6 +152,108 @@ function startPingLoop() {
   }, PING_INTERVAL_MS);
 }
 
+function attachAccountView(i) {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+
+  const view = new WebContentsView({
+    webPreferences: {
+      partition: partitions[i],
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  // Garante fundo opaco enquanto a página carrega (evita "painel morto").
+  view.setBackgroundColor('#0f1115');
+  mainWindow.contentView.addChildView(view);
+
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    // Mantém o jogo no painel; URLs reais navegam in-place.
+    if (url && /^https?:\/\//i.test(url)) {
+      setImmediate(() => {
+        if (!view.webContents.isDestroyed()) view.webContents.loadURL(url);
+      });
+      return { action: 'deny' };
+    }
+    // about:blank / popups de script: permite na mesma partition, janela separada mínima.
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        width: 1280,
+        height: 720,
+        autoHideMenuBar: true,
+        backgroundColor: '#0f1115',
+        webPreferences: {
+          partition: partitions[i],
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          backgroundThrottling: false,
+        },
+      },
+    };
+  });
+
+  view.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
+    if (isMainFrame) stats[i].navStarted = Date.now();
+  });
+  let paintedOnce = false;
+  view.webContents.on('did-finish-load', () => {
+    if (stats[i].navStarted) {
+      stats[i].loadMs = Date.now() - stats[i].navStarted;
+      sendStats();
+    }
+    // Um único nudge de repaint no primeiro load — mitiga painel em branco.
+    if (!paintedOnce) {
+      paintedOnce = true;
+      const bounds = view.getBounds();
+      if (bounds && bounds.width > 0 && bounds.height > 0) {
+        view.setBounds({ ...bounds, width: Math.max(1, bounds.width - 1) });
+        view.setBounds(bounds);
+      }
+    }
+  });
+  view.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (!isMainFrame) return;
+    stats[i].loadMs = null;
+    sendStats();
+    console.error(`Falha ao carregar conta ${i + 1}:`, code, desc, url);
+  });
+
+  return view;
+}
+
+function createAccountViews() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (views.length > 0) return;
+
+  for (let i = 0; i < ACCOUNT_COUNT; i++) {
+    const view = attachAccountView(i);
+    if (view) views.push(view);
+  }
+
+  layoutViews();
+
+  // Reordena 1→4 no topo do contentView (acima do chrome HTML das labels).
+  for (const view of views) {
+    try {
+      mainWindow.contentView.addChildView(view);
+    } catch {
+      // already attached
+    }
+  }
+  layoutViews();
+
+  // Carrega em sequência curta para não disputar o mesmo host de uma vez.
+  views.forEach((view, i) => {
+    setTimeout(() => {
+      if (!view.webContents.isDestroyed()) view.webContents.loadURL(HOME_URL);
+    }, 50 * i);
+  });
+}
+
 function createWindow() {
   const iconPath = resolveIcon();
   const iconImage = nativeImage.createFromPath(iconPath);
@@ -170,45 +272,12 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  for (let i = 0; i < ACCOUNT_COUNT; i++) {
-    const view = new BrowserView({
-      webPreferences: {
-        partition: partitions[i],
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-    mainWindow.addBrowserView(view);
-    view.webContents.setWindowOpenHandler(({ url }) => {
-      view.webContents.loadURL(url);
-      return { action: 'deny' };
-    });
-    view.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
-      if (isMainFrame) stats[i].navStarted = Date.now();
-    });
-    view.webContents.on('did-finish-load', () => {
-      if (stats[i].navStarted) {
-        stats[i].loadMs = Date.now() - stats[i].navStarted;
-        sendStats();
-      }
-    });
-    view.webContents.on('did-fail-load', (_e, _code, _desc, _url, isMainFrame) => {
-      if (isMainFrame) {
-        stats[i].loadMs = null;
-        sendStats();
-      }
-    });
-    view.webContents.loadURL(HOME_URL);
-    views.push(view);
-  }
-
-  layoutViews();
   if (!iconImage.isEmpty()) mainWindow.setIcon(iconImage);
 
   const layout = () => layoutViews();
@@ -226,9 +295,14 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.show();
     if (!iconImage.isEmpty()) mainWindow.setIcon(iconImage);
+    // Cria os 4 painéis só depois da janela visível.
+    // BrowserView/WebContents criados com show:false costumam ficar em branco
+    // (principalmente os primeiros do z-order = Conta 1 e Conta 2).
+    createAccountViews();
     layoutViews();
     sendNames();
     startPingLoop();
+    buildMenu();
   });
 
   buildMenu();
@@ -249,13 +323,14 @@ function layoutViews() {
 
   views.forEach((view, i) => {
     const pos = positions[i];
-    view.setBounds({
+    const bounds = {
       x: pos.x,
       y: pos.y + LABEL_HEIGHT,
-      width: cellW,
+      width: Math.max(0, cellW),
       height: Math.max(0, cellH - LABEL_HEIGHT),
-    });
-    view.setAutoResize({ width: false, height: false });
+    };
+    view.setBounds(bounds);
+    view.setVisible(bounds.width > 0 && bounds.height > 0);
   });
 
   if (!mainWindow.isDestroyed()) {
@@ -433,10 +508,14 @@ app.whenReady().then(() => {
   loadNames();
   createWindow();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      views.length = 0;
+      createWindow();
+    }
   });
 });
 
 app.on('window-all-closed', () => {
+  views.length = 0;
   if (process.platform !== 'darwin') app.quit();
 });

@@ -10,6 +10,7 @@ Navegador em grade **2×2** para [huntera.com.br](https://huntera.com.br), com *
 - Clique no nome da janela (ícone ✎) para renomear a conta; o nome fica salvo localmente
 - Ping de cada janela até o servidor do jogo (`huntera.com.br:443` / `/game-socket`)
 - Menu nativo do Electron (Alt para mostrar): recarregar, home, limpar cookies
+- Painéis via `WebContentsView` (API atual do Electron), criados após a janela aparecer — evita Conta 1/2 em branco
 
 ## Uso
 
