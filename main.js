@@ -31,6 +31,8 @@ const stats = Array.from({ length: ACCOUNT_COUNT }, () => ({
   samples: [],
   navStarted: null,
 }));
+/** @type {NodeJS.Timeout | null} */
+let pingInterval = null;
 
 const partitions = [
   'persist:huntera-account-1',
@@ -142,10 +144,11 @@ function measurePing(idx) {
 }
 
 function startPingLoop() {
+  if (pingInterval) return;
   for (let i = 0; i < ACCOUNT_COUNT; i++) {
     setTimeout(() => measurePing(i), 400 * i);
   }
-  setInterval(() => {
+  pingInterval = setInterval(() => {
     for (let i = 0; i < ACCOUNT_COUNT; i++) {
       setTimeout(() => measurePing(i), 250 * i);
     }
@@ -246,8 +249,13 @@ function createAccountViews() {
   }
   layoutViews();
 
-  // Carrega em sequência curta para não disputar o mesmo host de uma vez.
+  // Restaura zoom salvo e carrega em sequência curta (evita disputa no mesmo host).
   views.forEach((view, i) => {
+    try {
+      view.webContents.setZoomFactor(zoomFactors[i] || 1);
+    } catch {
+      // ignore
+    }
     setTimeout(() => {
       if (!view.webContents.isDestroyed()) view.webContents.loadURL(HOME_URL);
     }, 50 * i);
@@ -501,6 +509,14 @@ ipcMain.handle('action', async (_event, payload) => {
   return { ok: true };
 });
 
+function resetViewsState() {
+  views.length = 0;
+  if (pingInterval) {
+    clearInterval(pingInterval);
+    pingInterval = null;
+  }
+}
+
 app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('br.com.huntera.quad');
@@ -509,13 +525,13 @@ app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      views.length = 0;
+      resetViewsState();
       createWindow();
     }
   });
 });
 
 app.on('window-all-closed', () => {
-  views.length = 0;
+  resetViewsState();
   if (process.platform !== 'darwin') app.quit();
 });
