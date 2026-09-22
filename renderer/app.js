@@ -24,7 +24,7 @@ function setStats(list) {
     const ping = formatMs(stat && stat.pingMs);
     const avg = formatMs(stat && stat.avgMs);
     const load = formatMs(stat && stat.loadMs);
-    el.textContent = `Ping ${ping}`;
+    el.textContent = ping === '—' ? '—' : ping;
     el.classList.remove('good', 'ok', 'bad');
     if (typeof stat?.pingMs === 'number') {
       el.classList.add(stat.pingMs < 80 ? 'good' : stat.pingMs < 160 ? 'ok' : 'bad');
