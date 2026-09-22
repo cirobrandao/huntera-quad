@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable --x64",
+    "build": "electron-builder --win portable --x64 && node scripts/stamp-portable-icon.js",
     "pack": "electron-builder --dir"
   },
   "build": {
@@ -15,15 +15,21 @@
     "productName": "Huntera Quad",
     "copyright": "Copyright © Ciro Brandão",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "forceCodeSigning": false,
+    "icon": "build/icon.ico",
+    "afterPack": "./scripts/set-win-icon.js",
     "files": [
       "main.js",
       "preload.js",
       "renderer/**/*",
+      "build/icon.ico",
       "package.json"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "portable",

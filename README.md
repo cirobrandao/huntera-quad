@@ -30,7 +30,7 @@ npm start
 
 ```bash
 set CSC_IDENTITY_AUTO_DISCOVERY=false
-npx electron-builder --win portable --x64 -c.win.signAndEditExecutable=false
+npm run build
 ```
 
-O executável sai em `dist/Huntera-Quad-Portable.exe`.
+O executável sai em `dist/Huntera-Quad-Portable.exe`, com o ícone da grade 2×2 no arquivo e na janela.

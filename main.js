@@ -147,6 +147,7 @@ function createWindow() {
     minHeight: 720,
     backgroundColor: '#0f1115',
     title: 'Huntera Quad',
+    icon: path.join(__dirname, 'build', 'icon.ico'),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -404,6 +405,9 @@ ipcMain.handle('action', async (_event, payload) => {
 });
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('br.com.huntera.quad');
+  }
   loadNames();
   createWindow();
   app.on('activate', () => {
