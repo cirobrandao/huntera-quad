@@ -63,61 +63,96 @@ button.danger:hover { background: #3a1b21; }
 }
 
 .label {
-  height: 28px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 0 10px;
   background: var(--label);
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   letter-spacing: 0.02em;
   pointer-events: auto;
+  overflow: hidden;
 }
 
-.account-name {
+.account-name,
+.account-name-input {
   min-width: 0;
-  max-width: 160px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border-radius: 6px;
+  padding: 4px 8px 4px 22px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text);
+  user-select: text;
+}
+
+.account-name {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
   cursor: text;
-  border-radius: 4px;
-  padding: 0 4px;
+  text-align: left;
+  position: relative;
+}
+
+.account-name::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.account-name::after {
+  content: "✎";
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .account-name:hover,
 .account-name.editing {
   background: #2a3142;
-  outline: 1px solid var(--accent);
-}
-
-.account-name.editing {
-  overflow: visible;
-  text-overflow: clip;
-}
-
-.account-name::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: #4ade80;
+  border-color: var(--accent);
 }
 
 .cell[data-account="1"] .account-name::before { background: #60a5fa; }
 .cell[data-account="2"] .account-name::before { background: #fbbf24; }
 .cell[data-account="3"] .account-name::before { background: #f472b6; }
 
-.latency {
-  color: var(--muted);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-  white-space: nowrap;
+.account-name-input {
+  border: 1px solid var(--accent);
+  background: #2a3142;
+  outline: none;
 }
+
+.latency {
+  flex: 0 0 auto;
+  color: #e8ecf4;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #121722;
+  border: 1px solid #2a3142;
+}
+
+.latency.good { color: #4ade80; border-color: #245c3a; }
+.latency.ok { color: #fbbf24; border-color: #5c4a1e; }
+.latency.bad { color: #f87171; border-color: #5c2424; }
 
 .cell-actions button {
   padding: 2px 8px;

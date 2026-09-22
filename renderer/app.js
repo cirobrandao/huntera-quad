@@ -11,8 +11,9 @@ function formatMs(ms) {
 
 function setName(account, name) {
   const el = document.querySelector(`[data-name-for="${account}"]`);
-  if (!el || el.isContentEditable) return;
-  el.textContent = name;
+  const input = document.querySelector(`[data-name-input="${account}"]`);
+  if (input && !input.hidden) return;
+  if (el) el.textContent = name;
 }
 
 function setStats(list) {
@@ -23,8 +24,12 @@ function setStats(list) {
     const ping = formatMs(stat && stat.pingMs);
     const avg = formatMs(stat && stat.avgMs);
     const load = formatMs(stat && stat.loadMs);
-    el.textContent = `ping ${ping} · load ${load}`;
-    el.title = `Ping atual: ${ping}\nMédia (20 amostras): ${avg}\nCarregamento da página: ${load}`;
+    el.textContent = `Ping ${ping}`;
+    el.classList.remove('good', 'ok', 'bad');
+    if (typeof stat?.pingMs === 'number') {
+      el.classList.add(stat.pingMs < 80 ? 'good' : stat.pingMs < 160 ? 'ok' : 'bad');
+    }
+    el.title = `Servidor do jogo huntera.com.br:443\nPing atual: ${ping}\nMédia (20 amostras): ${avg}\nCarregamento da página: ${load}`;
   });
 }
 
@@ -58,17 +63,24 @@ function bindActions(root) {
 function bindNameEditors() {
   document.querySelectorAll('.account-name').forEach((el) => {
     const account = Number(el.getAttribute('data-name-for'));
+    const input = document.querySelector(`[data-name-input="${account}"]`);
+    if (!input) return;
     let previous = el.textContent;
 
-    const finish = async (cancel) => {
-      if (!el.classList.contains('editing') && el.contentEditable !== 'true') return;
-      el.contentEditable = 'false';
+    const close = () => {
+      input.hidden = true;
+      el.hidden = false;
       el.classList.remove('editing');
+    };
+
+    const finish = async (cancel) => {
+      if (input.hidden) return;
+      const next = cancel ? previous : input.value;
+      close();
       if (cancel) {
         el.textContent = previous;
         return;
       }
-      const next = el.textContent.replace(/\s+/g, ' ').trim();
       try {
         const result = await window.hunteraQuad.action({
           type: 'set-name',
@@ -85,23 +97,22 @@ function bindNameEditors() {
       }
     };
 
-    el.addEventListener('click', () => {
-      if (el.isContentEditable) return;
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       previous = el.textContent;
-      el.contentEditable = 'true';
+      el.hidden = true;
       el.classList.add('editing');
-      el.focus();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
+      input.hidden = false;
+      input.value = previous;
+      input.focus();
+      input.select();
     });
 
-    el.addEventListener('keydown', (e) => {
+    input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        el.blur();
+        finish(false);
       }
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -109,9 +120,7 @@ function bindNameEditors() {
       }
     });
 
-    el.addEventListener('blur', () => {
-      if (el.classList.contains('editing')) finish(false);
-    });
+    input.addEventListener('blur', () => finish(false));
   });
 }
 

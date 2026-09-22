@@ -1,10 +1,13 @@
-const { app, BrowserWindow, BrowserView, ipcMain, Menu, shell, session, net } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, Menu, shell, session, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const tls = require('tls');
 
 const HOME_URL = 'https://huntera.com.br';
+const GAME_HOST = 'huntera.com.br';
+const GAME_PORT = 443;
 const ACCOUNT_COUNT = 4;
-const LABEL_HEIGHT = 28;
+const LABEL_HEIGHT = 36;
 const GAP = 2;
 const ZOOM_STEP = 0.1;
 const ZOOM_MIN = 0.5;
@@ -92,16 +95,20 @@ function sendNames() {
   mainWindow.webContents.send('names', [...accountNames]);
 }
 
+function resolveIcon() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'icon.ico'),
+    path.join(__dirname, 'build', 'icon.ico'),
+  ];
+  return candidates.find((p) => p && fs.existsSync(p)) || candidates[1];
+}
+
 function measurePing(idx) {
   const start = Date.now();
-  const request = net.request({
-    method: 'GET',
-    url: HOME_URL,
-    session: session.fromPartition(partitions[idx]),
-    redirect: 'follow',
-  });
-
-  const finish = (ok) => {
+  let settled = false;
+  const once = (ok) => {
+    if (settled) return;
+    settled = true;
     const ms = Date.now() - start;
     if (ok) {
       stats[idx].pingMs = ms;
@@ -111,21 +118,27 @@ function measurePing(idx) {
     sendStats();
   };
 
-  let settled = false;
-  const once = (ok) => {
-    if (settled) return;
-    settled = true;
-    finish(ok);
-    try {
-      request.abort();
-    } catch {
-      // already finished
-    }
-  };
-
-  request.on('response', () => once(true));
-  request.on('error', () => once(false));
-  request.end();
+  try {
+    const socket = tls.connect(
+      {
+        host: GAME_HOST,
+        port: GAME_PORT,
+        servername: GAME_HOST,
+        timeout: 4000,
+      },
+      () => {
+        once(true);
+        socket.end();
+      }
+    );
+    socket.on('timeout', () => {
+      once(false);
+      socket.destroy();
+    });
+    socket.on('error', () => once(false));
+  } catch {
+    once(false);
+  }
 }
 
 function startPingLoop() {
@@ -140,6 +153,8 @@ function startPingLoop() {
 }
 
 function createWindow() {
+  const iconPath = resolveIcon();
+  const iconImage = nativeImage.createFromPath(iconPath);
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
@@ -147,7 +162,7 @@ function createWindow() {
     minHeight: 720,
     backgroundColor: '#0f1115',
     title: 'Huntera Quad',
-    icon: path.join(__dirname, 'build', 'icon.ico'),
+    icon: iconImage.isEmpty() ? iconPath : iconImage,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -193,8 +208,14 @@ function createWindow() {
     views.push(view);
   }
 
+  layoutViews();
+  if (!iconImage.isEmpty()) mainWindow.setIcon(iconImage);
+
   const layout = () => layoutViews();
   mainWindow.on('resize', layout);
+  mainWindow.on('maximize', layout);
+  mainWindow.on('unmaximize', layout);
+  mainWindow.on('show', layout);
   mainWindow.webContents.on('did-finish-load', () => {
     layout();
     sendNames();
@@ -204,6 +225,7 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.maximize();
     mainWindow.show();
+    if (!iconImage.isEmpty()) mainWindow.setIcon(iconImage);
     layoutViews();
     sendNames();
     startPingLoop();

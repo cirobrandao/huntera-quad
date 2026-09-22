@@ -7,8 +7,8 @@ Navegador em grade **2×2** para [huntera.com.br](https://huntera.com.br), com *
 - Quatro painéis lado a lado (2 em cima, 2 embaixo)
 - Cookies isolados por painel (`persist:huntera-account-1` … `4`)
 - Zoom − / + por conta (ao lado do reload)
-- Clique no nome da janela para renomear a conta (fica salvo localmente)
-- Latência por janela: ping até huntera.com.br e tempo de carregamento
+- Clique no nome da janela (ícone ✎) para renomear a conta; o nome fica salvo localmente
+- Ping de cada janela até o servidor do jogo (`huntera.com.br:443` / `/game-socket`)
 - Menu nativo do Electron (Alt para mostrar): recarregar, home, limpar cookies
 
 ## Uso
