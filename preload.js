@@ -12,4 +12,14 @@ contextBridge.exposeInMainWorld('hunteraQuad', {
     ipcRenderer.on('zoom', handler);
     return () => ipcRenderer.removeListener('zoom', handler);
   },
+  onNames: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('names', handler);
+    return () => ipcRenderer.removeListener('names', handler);
+  },
+  onStats: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('stats', handler);
+    return () => ipcRenderer.removeListener('stats', handler);
+  },
 });

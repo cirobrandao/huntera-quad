@@ -1,4 +1,5 @@
-const { app, BrowserWindow, BrowserView, ipcMain, Menu, shell, session } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, Menu, shell, session, net } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 const HOME_URL = 'https://huntera.com.br';
@@ -8,6 +9,9 @@ const GAP = 2;
 const ZOOM_STEP = 0.1;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
+const PING_INTERVAL_MS = 5000;
+const PING_SAMPLE_LIMIT = 20;
+const NAME_MAX_LEN = 32;
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -15,6 +19,15 @@ let mainWindow = null;
 const views = [];
 /** @type {number[]} */
 const zoomFactors = [1, 1, 1, 1];
+/** @type {string[]} */
+let accountNames = ['Conta 1', 'Conta 2', 'Conta 3', 'Conta 4'];
+/** @type {{ pingMs: number | null, loadMs: number | null, samples: number[], navStarted: number | null }[]} */
+const stats = Array.from({ length: ACCOUNT_COUNT }, () => ({
+  pingMs: null,
+  loadMs: null,
+  samples: [],
+  navStarted: null,
+}));
 
 const partitions = [
   'persist:huntera-account-1',
@@ -22,6 +35,109 @@ const partitions = [
   'persist:huntera-account-3',
   'persist:huntera-account-4',
 ];
+
+function namesFile() {
+  return path.join(app.getPath('userData'), 'account-names.json');
+}
+
+function loadNames() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(namesFile(), 'utf8'));
+    if (Array.isArray(raw)) {
+      accountNames = [0, 1, 2, 3].map((i) => sanitizeName(raw[i], i));
+      return;
+    }
+  } catch {
+    // keep defaults
+  }
+}
+
+function saveNames() {
+  try {
+    fs.writeFileSync(namesFile(), JSON.stringify(accountNames, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Não foi possível salvar os nomes das contas', err);
+  }
+}
+
+function sanitizeName(value, idx) {
+  const text = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, NAME_MAX_LEN);
+  return text || `Conta ${idx + 1}`;
+}
+
+function avgPing(idx) {
+  const samples = stats[idx].samples;
+  if (!samples.length) return null;
+  return Math.round(samples.reduce((a, b) => a + b, 0) / samples.length);
+}
+
+function publicStats() {
+  return stats.map((s, i) => ({
+    pingMs: s.pingMs,
+    loadMs: s.loadMs,
+    avgMs: avgPing(i),
+  }));
+}
+
+function sendStats() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('stats', publicStats());
+}
+
+function sendNames() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('names', [...accountNames]);
+}
+
+function measurePing(idx) {
+  const start = Date.now();
+  const request = net.request({
+    method: 'GET',
+    url: HOME_URL,
+    session: session.fromPartition(partitions[idx]),
+    redirect: 'follow',
+  });
+
+  const finish = (ok) => {
+    const ms = Date.now() - start;
+    if (ok) {
+      stats[idx].pingMs = ms;
+      stats[idx].samples.push(ms);
+      if (stats[idx].samples.length > PING_SAMPLE_LIMIT) stats[idx].samples.shift();
+    }
+    sendStats();
+  };
+
+  let settled = false;
+  const once = (ok) => {
+    if (settled) return;
+    settled = true;
+    finish(ok);
+    try {
+      request.abort();
+    } catch {
+      // already finished
+    }
+  };
+
+  request.on('response', () => once(true));
+  request.on('error', () => once(false));
+  request.end();
+}
+
+function startPingLoop() {
+  for (let i = 0; i < ACCOUNT_COUNT; i++) {
+    setTimeout(() => measurePing(i), 400 * i);
+  }
+  setInterval(() => {
+    for (let i = 0; i < ACCOUNT_COUNT; i++) {
+      setTimeout(() => measurePing(i), 250 * i);
+    }
+  }, PING_INTERVAL_MS);
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -57,18 +173,39 @@ function createWindow() {
       view.webContents.loadURL(url);
       return { action: 'deny' };
     });
+    view.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
+      if (isMainFrame) stats[i].navStarted = Date.now();
+    });
+    view.webContents.on('did-finish-load', () => {
+      if (stats[i].navStarted) {
+        stats[i].loadMs = Date.now() - stats[i].navStarted;
+        sendStats();
+      }
+    });
+    view.webContents.on('did-fail-load', (_e, _code, _desc, _url, isMainFrame) => {
+      if (isMainFrame) {
+        stats[i].loadMs = null;
+        sendStats();
+      }
+    });
     view.webContents.loadURL(HOME_URL);
     views.push(view);
   }
 
   const layout = () => layoutViews();
   mainWindow.on('resize', layout);
-  mainWindow.webContents.on('did-finish-load', layout);
+  mainWindow.webContents.on('did-finish-load', () => {
+    layout();
+    sendNames();
+    sendStats();
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.maximize();
     mainWindow.show();
     layoutViews();
+    sendNames();
+    startPingLoop();
   });
 
   buildMenu();
@@ -108,6 +245,8 @@ function layoutViews() {
       cellW,
       cellH,
       zooms: [...zoomFactors],
+      names: [...accountNames],
+      stats: publicStats(),
     });
   }
 }
@@ -143,35 +282,35 @@ function buildMenu() {
     },
     {
       label: 'Contas',
-      submenu: [1, 2, 3, 4].map((n) => ({
-        label: `Conta ${n}`,
+      submenu: accountNames.map((name, i) => ({
+        label: name,
         submenu: [
           {
             label: 'Recarregar',
-            click: () => views[n - 1]?.webContents.reload(),
+            click: () => views[i]?.webContents.reload(),
           },
           {
             label: 'Home huntera.com.br',
-            click: () => views[n - 1]?.webContents.loadURL(HOME_URL),
+            click: () => views[i]?.webContents.loadURL(HOME_URL),
           },
           {
             label: 'Zoom +',
-            click: () => setZoom(n - 1, zoomFactors[n - 1] + ZOOM_STEP),
+            click: () => setZoom(i, zoomFactors[i] + ZOOM_STEP),
           },
           {
             label: 'Zoom −',
-            click: () => setZoom(n - 1, zoomFactors[n - 1] - ZOOM_STEP),
+            click: () => setZoom(i, zoomFactors[i] - ZOOM_STEP),
           },
           {
             label: 'Zoom 100%',
-            click: () => setZoom(n - 1, 1),
+            click: () => setZoom(i, 1),
           },
           {
             label: 'Limpar cookies desta conta',
             click: async () => {
-              const ses = session.fromPartition(partitions[n - 1]);
+              const ses = session.fromPartition(partitions[i]);
               await ses.clearStorageData();
-              views[n - 1]?.webContents.loadURL(HOME_URL);
+              views[i]?.webContents.loadURL(HOME_URL);
             },
           },
         ],
@@ -205,7 +344,7 @@ function buildMenu() {
 }
 
 ipcMain.handle('action', async (_event, payload) => {
-  const { type, account } = payload || {};
+  const { type, account, name } = payload || {};
   const idx = typeof account === 'number' ? account : -1;
   const target = idx >= 0 && idx < views.length ? [views[idx]] : views;
 
@@ -241,6 +380,14 @@ ipcMain.handle('action', async (_event, payload) => {
       const r = setZoom(idx, 1);
       return { ok: r.ok, zoom: r.zoom };
     }
+    case 'set-name': {
+      if (idx < 0) return { ok: false };
+      accountNames[idx] = sanitizeName(name, idx);
+      saveNames();
+      sendNames();
+      buildMenu();
+      return { ok: true, name: accountNames[idx] };
+    }
     case 'clear-account': {
       if (idx < 0) return { ok: false };
       const ses = session.fromPartition(partitions[idx]);
@@ -257,6 +404,7 @@ ipcMain.handle('action', async (_event, payload) => {
 });
 
 app.whenReady().then(() => {
+  loadNames();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -75,7 +75,29 @@ button.danger:hover { background: #3a1b21; }
   pointer-events: auto;
 }
 
-.label span::before {
+.account-name {
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.account-name:hover,
+.account-name.editing {
+  background: #2a3142;
+  outline: 1px solid var(--accent);
+}
+
+.account-name.editing {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.account-name::before {
   content: "";
   display: inline-block;
   width: 8px;
@@ -85,9 +107,17 @@ button.danger:hover { background: #3a1b21; }
   background: #4ade80;
 }
 
-.cell[data-account="1"] .label span::before { background: #60a5fa; }
-.cell[data-account="2"] .label span::before { background: #fbbf24; }
-.cell[data-account="3"] .label span::before { background: #f472b6; }
+.cell[data-account="1"] .account-name::before { background: #60a5fa; }
+.cell[data-account="2"] .account-name::before { background: #fbbf24; }
+.cell[data-account="3"] .account-name::before { background: #f472b6; }
+
+.latency {
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  white-space: nowrap;
+}
 
 .cell-actions button {
   padding: 2px 8px;
