@@ -3,6 +3,18 @@ const fs = require('fs');
 const path = require('path');
 const tls = require('tls');
 
+// Portable EXE unpacks into %TEMP% and would store cookies there. That folder
+// is wiped, and a stale lock in it stops the first sessions (accounts 1 and 2)
+// from opening. Keep logins next to the EXE instead.
+if (process.env.PORTABLE_EXECUTABLE_DIR) {
+  app.setPath('userData', path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'HunteraSquadData'));
+} else if (app.isPackaged) {
+  app.setPath('userData', path.join(path.dirname(process.execPath), 'HunteraSquadData'));
+}
+app.setName('huntera-squad');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
 const HOME_URL = 'https://huntera.com.br';
 const GAME_HOST = 'huntera.com.br';
 const GAME_PORT = 443;
@@ -161,7 +173,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 720,
     backgroundColor: '#0f1115',
-    title: 'Huntera Quad',
+    title: 'Huntera Squad',
     icon: iconImage.isEmpty() ? iconPath : iconImage,
     show: false,
     autoHideMenuBar: true,
@@ -175,37 +187,10 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  // Do not open all 4 persistent partitions at once. On the portable EXE the
+  // first Chromium network services stall, so accounts 1 and 2 never paint.
   for (let i = 0; i < ACCOUNT_COUNT; i++) {
-    const view = new BrowserView({
-      webPreferences: {
-        partition: partitions[i],
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-    mainWindow.addBrowserView(view);
-    view.webContents.setWindowOpenHandler(({ url }) => {
-      view.webContents.loadURL(url);
-      return { action: 'deny' };
-    });
-    view.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
-      if (isMainFrame) stats[i].navStarted = Date.now();
-    });
-    view.webContents.on('did-finish-load', () => {
-      if (stats[i].navStarted) {
-        stats[i].loadMs = Date.now() - stats[i].navStarted;
-        sendStats();
-      }
-    });
-    view.webContents.on('did-fail-load', (_e, _code, _desc, _url, isMainFrame) => {
-      if (isMainFrame) {
-        stats[i].loadMs = null;
-        sendStats();
-      }
-    });
-    view.webContents.loadURL(HOME_URL);
-    views.push(view);
+    setTimeout(() => attachView(i), 500 + i * 700);
   }
 
   layoutViews();
@@ -248,12 +233,13 @@ function layoutViews() {
   ];
 
   views.forEach((view, i) => {
+    if (!view) return;
     const pos = positions[i];
     view.setBounds({
       x: pos.x,
       y: pos.y + LABEL_HEIGHT,
-      width: cellW,
-      height: Math.max(0, cellH - LABEL_HEIGHT),
+      width: Math.max(1, cellW),
+      height: Math.max(1, cellH - LABEL_HEIGHT),
     });
     view.setAutoResize({ width: false, height: false });
   });
@@ -272,6 +258,50 @@ function layoutViews() {
       stats: publicStats(),
     });
   }
+}
+
+function attachView(idx) {
+  const view = new BrowserView({
+    webPreferences: {
+      partition: partitions[idx],
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+  mainWindow.addBrowserView(view);
+  view.webContents.setBackgroundThrottling(false);
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    view.webContents.loadURL(url).catch((err) => {
+      console.error(`Conta ${idx + 1} popup:`, err);
+    });
+    return { action: 'deny' };
+  });
+  view.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
+    if (isMainFrame) stats[idx].navStarted = Date.now();
+  });
+  view.webContents.on('did-finish-load', () => {
+    if (stats[idx].navStarted) {
+      stats[idx].loadMs = Date.now() - stats[idx].navStarted;
+      sendStats();
+    }
+    layoutViews();
+  });
+  view.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return;
+    stats[idx].loadMs = null;
+    sendStats();
+    console.error(`Conta ${idx + 1} falhou:`, code, desc, url);
+  });
+  view.webContents.on('render-process-gone', (_e, details) => {
+    console.error(`Conta ${idx + 1} processo encerrou:`, details && details.reason);
+  });
+  views[idx] = view;
+  layoutViews();
+  view.webContents.loadURL(HOME_URL).catch((err) => {
+    console.error(`Conta ${idx + 1} loadURL:`, err);
+  });
 }
 
 function setZoom(idx, next) {

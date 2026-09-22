@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('hunteraQuad', {
+contextBridge.exposeInMainWorld('hunteraSquad', {
   action: (payload) => ipcRenderer.invoke('action', payload),
   onLayout: (cb) => {
     const handler = (_e, data) => cb(data);

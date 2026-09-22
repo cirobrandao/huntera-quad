@@ -1,6 +1,6 @@
 {
-  "name": "huntera-quad",
-  "version": "1.3.1",
+  "name": "huntera-squad",
+  "version": "1.4.0",
   "description": "Navegador 2x2 com sessões isoladas para huntera.com.br",
   "main": "main.js",
   "author": "Ciro Brandão",
@@ -11,8 +11,8 @@
     "pack": "electron-builder --dir"
   },
   "build": {
-    "appId": "br.com.huntera.quad",
-    "productName": "Huntera Quad",
+    "appId": "br.com.huntera.squad",
+    "productName": "Huntera Squad",
     "copyright": "Copyright © Ciro Brandão",
     "directories": {
       "output": "dist",
@@ -46,7 +46,7 @@
       "signAndEditExecutable": false
     },
     "portable": {
-      "artifactName": "Huntera-Quad-Portable.exe"
+      "artifactName": "Huntera-Squad-Portable.exe"
     }
   },
   "devDependencies": {

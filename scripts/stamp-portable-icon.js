@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const ResEdit = require('resedit');
 
-const exePath = path.join(__dirname, '..', 'dist', 'Huntera-Quad-Portable.exe');
+const exePath = path.join(__dirname, '..', 'dist', 'Huntera-Squad-Portable.exe');
 const icoPath = path.join(__dirname, '..', 'build', 'icon.ico');
 
 if (!fs.existsSync(exePath)) {

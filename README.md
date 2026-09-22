@@ -1,4 +1,4 @@
-# Huntera Quad
+# Huntera Squad
 
 Navegador em grade **2×2** para [huntera.com.br](https://huntera.com.br), com **4 sessões isoladas** (cookies e storage separados por conta).
 
@@ -13,9 +13,9 @@ Navegador em grade **2×2** para [huntera.com.br](https://huntera.com.br), com *
 
 ## Uso
 
-1. Abra o atalho **Huntera Quad** ou `dist/Huntera-Quad-Portable.exe`
+1. Abra o atalho **Huntera Squad** ou `dist/Huntera-Squad-Portable.exe`
 2. Faça login com uma conta diferente em cada painel
-3. Os logins ficam salvos localmente
+3. No EXE portátil os logins ficam em `HunteraSquadData`, ao lado do executável
 
 Na primeira execução, permita o app no Firewall do Windows.
 
@@ -33,4 +33,4 @@ set CSC_IDENTITY_AUTO_DISCOVERY=false
 npm run build
 ```
 
-O executável sai em `dist/Huntera-Quad-Portable.exe`, com o ícone da grade 2×2 no arquivo e na janela.
+O executável sai em `dist/Huntera-Squad-Portable.exe`, com o ícone da grade 2×2 no arquivo e na janela.

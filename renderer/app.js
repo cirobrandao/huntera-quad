@@ -49,7 +49,7 @@ function bindActions(root) {
         if (!ok) return;
       }
       try {
-        const result = await window.hunteraQuad.action(payload);
+        const result = await window.hunteraSquad.action(payload);
         if (result && typeof result.zoom === 'number' && accountAttr !== null) {
           setZoomLabel(Number(accountAttr), result.zoom);
         }
@@ -82,7 +82,7 @@ function bindNameEditors() {
         return;
       }
       try {
-        const result = await window.hunteraQuad.action({
+        const result = await window.hunteraSquad.action({
           type: 'set-name',
           account,
           name: next,
@@ -127,8 +127,8 @@ function bindNameEditors() {
 bindActions(document);
 bindNameEditors();
 
-if (window.hunteraQuad && typeof window.hunteraQuad.onLayout === 'function') {
-  window.hunteraQuad.onLayout((data) => {
+if (window.hunteraSquad && typeof window.hunteraSquad.onLayout === 'function') {
+  window.hunteraSquad.onLayout((data) => {
     const grid = document.getElementById('grid');
     if (!grid || !data) return;
     grid.style.top = '0';
@@ -148,16 +148,16 @@ if (window.hunteraQuad && typeof window.hunteraQuad.onLayout === 'function') {
   });
 }
 
-if (window.hunteraQuad && typeof window.hunteraQuad.onZoom === 'function') {
-  window.hunteraQuad.onZoom(({ account, zoom }) => setZoomLabel(account, zoom));
+if (window.hunteraSquad && typeof window.hunteraSquad.onZoom === 'function') {
+  window.hunteraSquad.onZoom(({ account, zoom }) => setZoomLabel(account, zoom));
 }
 
-if (window.hunteraQuad && typeof window.hunteraQuad.onNames === 'function') {
-  window.hunteraQuad.onNames((names) => {
+if (window.hunteraSquad && typeof window.hunteraSquad.onNames === 'function') {
+  window.hunteraSquad.onNames((names) => {
     if (Array.isArray(names)) names.forEach((name, i) => setName(i, name));
   });
 }
 
-if (window.hunteraQuad && typeof window.hunteraQuad.onStats === 'function') {
-  window.hunteraQuad.onStats(setStats);
+if (window.hunteraSquad && typeof window.hunteraSquad.onStats === 'function') {
+  window.hunteraSquad.onStats(setStats);
 }
